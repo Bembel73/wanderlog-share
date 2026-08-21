@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WanderLog</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --ink: #1a1714;
+    --ink-muted: #6b6560;
+    --ink-faint: #b0aba5;
+    --paper: #faf8f4;
+    --paper-warm: #f3efe8;
+    --paper-card: #ffffff;
+    --accent: #c4773a;
+    --accent-light: #f5e8d8;
+    --accent-dark: #8a4f22;
+    --teal: #2d7d6f;
+    --red: #c44a3a;
+    --border: rgba(26,23,20,0.11);
+    --border-med: rgba(26,23,20,0.22);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  h1, h2, h3 { margin: 0; }
+  button { font-family: inherit; cursor: pointer; }
+  input, textarea { font-family: inherit; font-size: 14px; }
+
+  /* Password gate */
+  #gate {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .gate-card {
+    background: var(--paper-card); border-radius: 20px; padding: 32px 28px;
+    max-width: 380px; width: 100%; box-shadow: 0 8px 24px rgba(26,23,20,0.15);
+  }
+  .gate-card h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .gate-card p { color: var(--ink-muted); font-size: 13px; margin: 0 0 20px; }
+  .gate-input {
+    width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--paper-warm); color: var(--ink); font-size: 15px; margin-bottom: 12px;
+  }
+  .gate-btn {
+    width: 100%; padding: 13px; border-radius: 12px; border: none;
+    background: var(--accent); color: #fff; font-weight: 600; font-size: 15px;
+  }
+  .gate-btn:disabled { opacity: 0.6; }
+  .gate-error { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 16px; }
+
+  /* App shell */
+  #app { max-width: 720px; margin: 0 auto; padding-bottom: 60px; }
+  header.journey-header {
+    background: var(--ink); color: var(--paper); padding: 20px;
+  }
+  header.journey-header h1 { font-size: 21px; font-weight: 700; }
+  header.journey-header .sub { color: rgba(250,248,244,0.5); font-size: 12px; margin-top: 3px; }
+  header.journey-header .desc { color: rgba(250,248,244,0.85); font-size: 14px; margin-top: 10px; line-height: 1.4; }
+
+  .stats-row { display: flex; gap: 10px; padding: 14px 20px; flex-wrap: wrap; }
+  .stat-chip {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--paper-card); border-radius: 999px; padding: 6px 12px;
+    font-size: 12px; color: var(--ink-muted); box-shadow: 0 1px 4px rgba(26,23,20,0.08);
+  }
+  .stat-chip b { color: var(--ink); font-weight: 600; }
+
+  #map { height: 320px; width: 100%; background: var(--paper-warm); }
+
+  .journey-like-row {
+    display: flex; align-items: center; gap: 10px; padding: 14px 20px;
+  }
+  .like-btn {
+    display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border-med); background: var(--paper-card);
+    border-radius: 999px; padding: 8px 14px; font-size: 13px; font-weight: 500; color: var(--ink);
+  }
+  .like-btn.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); }
+
+  section.block { padding: 8px 20px 24px; }
+  section.block h2 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .photo-card {
+    background: var(--paper-card); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 1px 6px rgba(26,23,20,0.1); scroll-margin-top: 16px;
+  }
+  .photo-card.highlight { outline: 2px solid var(--accent); }
+  .photo-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: pointer; }
+  .photo-card .pc-body { padding: 10px; }
+  .photo-card .pc-caption { font-size: 12px; color: var(--ink); margin-bottom: 6px; }
+  .photo-card .pc-coords { font-size: 10px; color: var(--ink-faint); margin-bottom: 8px; }
+  .photo-card .pc-actions { display: flex; align-items: center; justify-content: space-between; }
+  .mini-like-btn {
+    display: flex; align-items: center; gap: 4px; border: none; background: var(--paper-warm);
+    border-radius: 999px; padding: 5px 9px; font-size: 11px; color: var(--ink-muted);
+  }
+  .mini-like-btn.active { background: var(--accent-light); color: var(--accent-dark); }
+  .pc-comment-toggle { font-size: 11px; color: var(--teal); background: none; border: none; padding: 5px; }
+
+  .comments-list { display: flex; flex-direction: column; gap: 10px; }
+  .comment-card {
+    background: var(--paper-card); border-radius: 12px; padding: 12px;
+    border-left: 3px solid var(--accent); font-size: 13px;
+  }
+  .comment-card .c-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .comment-card .c-author { font-weight: 600; font-size: 13px; }
+  .comment-card .c-time { font-size: 10px; color: var(--ink-faint); }
+  .comment-card .c-body { color: var(--ink); line-height: 1.4; word-wrap: break-word; }
+  .comment-empty { font-size: 12px; color: var(--ink-faint); padding: 4px 0; }
+
+  .comment-form { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .comment-form input, .comment-form textarea {
+    background: var(--paper-warm); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 11px; color: var(--ink);
+  }
+  .comment-form textarea { resize: vertical; min-height: 56px; }
+  .comment-form button {
+    align-self: flex-start; background: var(--accent); color: #fff; border: none;
+    border-radius: 10px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+  }
+  .comment-form button:disabled { opacity: 0.6; }
+
+  .photo-comments { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); display: none; }
+  .photo-comments.open { display: block; }
+  .photo-comments .comment-card { padding: 8px; font-size: 12px; }
+  .photo-comments .comment-form { margin-top: 8px; }
+
+  #lightbox {
+    position: fixed; inset: 0; background: rgba(26,23,20,0.95); display: none;
+    align-items: center; justify-content: center; padding: 20px; z-index: 50;
+  }
+  #lightbox.open { display: flex; }
+  #lightbox img { max-width: 100%; max-height: 85vh; border-radius: 8px; }
+  #lightbox .lb-close {
+    position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-radius: 20px;
+    background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 20px;
+  }
+
+  .footer-brand { text-align: center; font-size: 11px; color: var(--ink-faint); padding: 20px; }
+
+  @media (prefers-color-scheme: dark) {
+    /* Keep the warm paper theme even in dark mode - it's the app's identity, not a themeable surface. */
+  }
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <div class="gate-card">
+    <h1>🧭 WanderLog</h1>
+    <p>This journey is password protected. Ask the person who shared it for the password.</p>
+    <input id="gate-password" class="gate-input" type="password" placeholder="Password" autocomplete="off" />
+    <button id="gate-submit" class="gate-btn">View Journey</button>
+    <div id="gate-error" class="gate-error"></div>
+  </div>
+</div>
+
+<div id="app" hidden>
+  <header class="journey-header">
+    <h1 id="j-title"></h1>
+    <div class="sub" id="j-date"></div>
+    <div class="desc" id="j-desc" hidden></div>
+  </header>
+
+  <div class="stats-row">
+    <div class="stat-chip">📍 <b id="j-distance"></b></div>
+    <div class="stat-chip">⏱ <b id="j-duration"></b></div>
+    <div class="stat-chip">📷 <b id="j-photocount"></b> photos</div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="journey-like-row">
+    <button id="j-like-btn" class="like-btn">
+      <span id="j-like-icon">🤍</span> <span id="j-like-count">0</span> Like this journey
+    </button>
+  </div>
+
+  <section class="block">
+    <h2>Photos</h2>
+    <div id="gallery" class="gallery-grid"></div>
+  </section>
+
+  <section class="block">
+    <h2>Comments</h2>
+    <div id="journey-comments" class="comments-list"></div>
+    <form id="journey-comment-form" class="comment-form">
+      <input id="jc-name" type="text" placeholder="Your name" maxlength="80" required />
+      <textarea id="jc-body" placeholder="Write something…" maxlength="1000" required></textarea>
+      <button type="submit">Post Comment</button>
+    </form>
+  </section>
+
+  <div class="footer-brand">Shared with WanderLog</div>
+</div>
+
+<div id="lightbox">
+  <button class="lb-close" id="lb-close">✕</button>
+  <img id="lb-img" src="" alt="" />
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var SUPABASE_URL = 'https://fqqgozzvbuswzpstgtec.supabase.co';
+  var ANON_KEY = 'sb_publishable_5zLoOgaVe_-apwQssTjuJQ_c9JGem0u';
+
+  var params = new URLSearchParams(location.search);
+  var journeyId = params.get('id');
+
+  var els = {
+    gate: document.getElementById('gate'),
+    gatePassword: document.getElementById('gate-password'),
+    gateSubmit: document.getElementById('gate-submit'),
+    gateError: document.getElementById('gate-error'),
+    app: document.getElementById('app'),
+    title: document.getElementById('j-title'),
+    date: document.getElementById('j-date'),
+    desc: document.getElementById('j-desc'),
+    distance: document.getElementById('j-distance'),
+    duration: document.getElementById('j-duration'),
+    photocount: document.getElementById('j-photocount'),
+    likeBtn: document.getElementById('j-like-btn'),
+    likeIcon: document.getElementById('j-like-icon'),
+    likeCount: document.getElementById('j-like-count'),
+    gallery: document.getElementById('gallery'),
+    journeyComments: document.getElementById('journey-comments'),
+    journeyCommentForm: document.getElementById('journey-comment-form'),
+    jcName: document.getElementById('jc-name'),
+    jcBody: document.getElementById('jc-body'),
+    lightbox: document.getElementById('lightbox'),
+    lbImg: document.getElementById('lb-img'),
+    lbClose: document.getElementById('lb-close'),
+  };
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s == null ? '' : String(s);
+    return d.innerHTML;
+  }
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      if (k === 'class') node.className = attrs[k];
+      else if (k === 'text') node.textContent = attrs[k];
+      else node.setAttribute(k, attrs[k]);
+    });
+    (children || []).forEach(function (c) { if (c) node.appendChild(c); });
+    return node;
+  }
+
+  function getClientId() {
+    var id = localStorage.getItem('wl_client_id');
+    if (!id) {
+      id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+      localStorage.setItem('wl_client_id', id);
+    }
+    return id;
+  }
+  var clientId = getClientId();
+
+  function sessionKey() { return 'wl_pw_' + journeyId; }
+  function getStoredPassword() { return sessionStorage.getItem(sessionKey()); }
+  function storePassword(pw) { sessionStorage.setItem(sessionKey(), pw); }
+
+  function rpc(name, body) {
+    return fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, {
+      method: 'POST',
+      headers: {
+        'apikey': ANON_KEY,
+        'Authorization': 'Bearer ' + ANON_KEY,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }).then(function (res) {
+      if (!res.ok) {
+        return res.json().catch(function () { return {}; }).then(function (err) {
+          throw new Error(err.message || 'Request failed');
+        });
+      }
+      return res.json();
+    });
+  }
+
+  function formatDuration(seconds) {
+    seconds = Math.round(seconds || 0);
+    var h = Math.floor(seconds / 3600);
+    var m = Math.floor((seconds % 3600) / 60);
+    var s = seconds % 60;
+    if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  function formatDate(iso) {
+    var d = new Date(iso);
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function formatTime(iso) {
+    var d = new Date(iso);
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+
+  var state = { journey: null, photos: [], comments: [], reactions: [], map: null, markers: {} };
+
+  // ── Password gate ──────────────────────────────────────────────────────
+
+  function showGateError(msg) {
+    els.gateError.textContent = msg || '';
+  }
+
+  function tryUnlock(password) {
+    if (!journeyId) {
+      showGateError('This link is missing a journey id.');
+      return Promise.resolve(false);
+    }
+    els.gateSubmit.disabled = true;
+    showGateError('');
+    return rpc('get_shared_journey', { p_id: journeyId, p_password: password })
+      .then(function (rows) {
+        if (!rows || rows.length === 0) {
+          showGateError('Wrong password, or this link no longer exists.');
+          return false;
+        }
+        state.journey = rows[0];
+        storePassword(password);
+        return true;
+      })
+      .catch(function (e) {
+        showGateError(e.message || 'Something went wrong.');
+        return false;
+      })
+      .finally(function () {
+        els.gateSubmit.disabled = false;
+      });
+  }
+
+  els.gateSubmit.addEventListener('click', function () {
+    var pw = els.gatePassword.value;
+    if (!pw) { showGateError('Enter the password.'); return; }
+    tryUnlock(pw).then(function (ok) { if (ok) enterApp(); });
+  });
+  els.gatePassword.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') els.gateSubmit.click();
+  });
+
+  function enterApp() {
+    els.gate.hidden = true;
+    els.app.hidden = false;
+    loadAll();
+  }
+
+  // Auto-unlock if we already verified this journey earlier in the session.
+  var remembered = getStoredPassword();
+  if (remembered) {
+    tryUnlock(remembered).then(function (ok) { if (ok) enterApp(); });
+  }
+
+  // ── Loading & rendering ────────────────────────────────────────────────
+
+  function pw() { return getStoredPassword(); }
+
+  function loadAll() {
+    Promise.all([
+      rpc('get_shared_photos', { p_id: journeyId, p_password: pw() }),
+      rpc('get_shared_comments', { p_id: journeyId, p_password: pw() }),
+      rpc('get_shared_reactions', { p_id: journeyId, p_password: pw() }),
+    ]).then(function (results) {
+      state.photos = results[0] || [];
+      state.comments = results[1] || [];
+      state.reactions = results[2] || [];
+      renderHeader();
+      renderMap();
+      renderJourneyLike();
+      renderGallery();
+      renderJourneyComments();
+    }).catch(function (e) {
+      alert('Failed to load journey: ' + e.message);
+    });
+  }
+
+  function renderHeader() {
+    var j = state.journey;
+    els.title.textContent = j.title;
+    els.date.textContent = formatDate(j.created_at);
+    if (j.description) {
+      els.desc.textContent = j.description;
+      els.desc.hidden = false;
+    }
+    els.distance.textContent = Number(j.distance_km || 0).toFixed(2) + ' km';
+    els.duration.textContent = formatDuration(j.duration_s);
+    els.photocount.textContent = state.photos.length;
+  }
+
+  function reactionCount(photoId) {
+    var target = photoId || null;
+    return state.reactions
+      .filter(function (r) { return (r.photo_id || null) === target; })
+      .reduce(function (sum, r) { return sum + Number(r.count); }, 0);
+  }
+
+  function hasReacted(photoId) {
+    // We don't get per-client state back from get_shared_reactions (it's
+    // aggregated), so track "I already liked this" locally per browser.
+    var key = 'wl_liked_' + journeyId + '_' + (photoId || 'journey');
+    return localStorage.getItem(key) === '1';
+  }
+  function setReacted(photoId, val) {
+    var key = 'wl_liked_' + journeyId + '_' + (photoId || 'journey');
+    if (val) localStorage.setItem(key, '1'); else localStorage.removeItem(key);
+  }
+
+  function renderJourneyLike() {
+    var count = reactionCount(null);
+    els.likeCount.textContent = count;
+    var active = hasReacted(null);
+    els.likeIcon.textContent = active ? '❤️' : '🤍';
+    els.likeBtn.classList.toggle('active', active);
+  }
+
+  els.likeBtn.addEventListener('click', function () {
+    toggleReaction(null).then(function () { renderJourneyLike(); });
+  });
+
+  function toggleReaction(photoId) {
+    return rpc('toggle_shared_reaction', {
+      p_id: journeyId, p_password: pw(), p_photo_id: photoId, p_client_id: clientId, p_emoji: '❤️',
+    }).then(function (liked) {
+      setReacted(photoId, liked);
+      var target = photoId || null;
+      var idx = state.reactions.findIndex(function (r) { return (r.photo_id || null) === target; });
+      var delta = liked ? 1 : -1;
+      if (idx >= 0) state.reactions[idx].count = Number(state.reactions[idx].count) + delta;
+      else state.reactions.push({ photo_id: target, emoji: '❤️', count: 1 });
+    });
+  }
+
+  // ── Map ─────────────────────────────────────────────────────────────────
+
+  function renderMap() {
+    var j = state.journey;
+    var track = (j.track || []).map(function (p) { return [p.lat, p.lng]; });
+    var center = track.length ? track[Math.floor(track.length / 2)] : (j.start_marker ? [j.start_marker.lat, j.start_marker.lng] : [48.8566, 2.3522]);
+
+    var map = L.map('map', { zoomControl: true }).setView(center, track.length ? 14 : 4);
+    state.map = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    if (track.length > 1) {
+      var line = L.polyline(track, { color: '#c4773a', weight: 3 }).addTo(map);
+      map.fitBounds(line.getBounds(), { padding: [24, 24] });
+    }
+
+    if (j.start_marker) {
+      L.marker([j.start_marker.lat, j.start_marker.lng], {
+        icon: L.divIcon({
+          className: '', iconSize: [16, 16], iconAnchor: [8, 8],
+          html: '<div style="width:16px;height:16px;border-radius:8px;background:#2d7d6f;border:3px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,0.4);"></div>',
+        }),
+      }).addTo(map);
+    }
+
+    var cameraSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9 2L7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>';
+
+    state.photos.forEach(function (p) {
+      if (p.lat == null || p.lng == null) return;
+      var marker = L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+          html: '<div style="width:26px;height:26px;border-radius:13px;background:#c4773a;border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.35);">' + cameraSvg + '</div>',
+        }),
+      }).addTo(map);
+      marker.on('click', function () { focusPhoto(p.id); });
+      state.markers[p.id] = marker;
+    });
+  }
+
+  function focusPhoto(photoId) {
+    var card = document.getElementById('photo-' + photoId);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('highlight');
+      setTimeout(function () { card.classList.remove('highlight'); }, 1500);
+    }
+    var marker = state.markers[photoId];
+    if (marker && state.map) state.map.panTo(marker.getLatLng());
+  }
+
+  // ── Gallery ────────────────────────────────────────────────────────────
+
+  function commentsFor(photoId) {
+    return state.comments.filter(function (c) { return c.photo_id === photoId; });
+  }
+
+  function buildCommentCard(c) {
+    return el('div', { class: 'comment-card' }, [
+      el('div', { class: 'c-head' }, [
+        el('span', { class: 'c-author', text: c.author_name }),
+        el('span', { class: 'c-time', text: formatDate(c.created_at) + ' · ' + formatTime(c.created_at) }),
+      ]),
+      el('div', { class: 'c-body', text: c.body }),
+    ]);
+  }
+
+  function buildCommentForm(photoId, onPosted) {
+    var form = el('form', { class: 'comment-form' });
+    var nameInput = el('input', { type: 'text', placeholder: 'Your name', maxlength: '80', required: 'required' });
+    var bodyInput = el('textarea', { placeholder: 'Write something…', maxlength: '500', required: 'required' });
+    var submitBtn = el('button', { type: 'submit', text: 'Post' });
+    form.appendChild(nameInput);
+    form.appendChild(bodyInput);
+    form.appendChild(submitBtn);
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = nameInput.value.trim();
+      var body = bodyInput.value.trim();
+      if (!name || !body) return;
+      submitBtn.disabled = true;
+      rpc('add_shared_comment', {
+        p_id: journeyId, p_password: pw(), p_photo_id: photoId, p_author: name, p_body: body,
+      }).then(function (rows) {
+        var newComment = rows[0];
+        state.comments.push(newComment);
+        nameInput.value = '';
+        bodyInput.value = '';
+        onPosted();
+      }).catch(function (e) {
+        alert('Could not post comment: ' + e.message);
+      }).finally(function () {
+        submitBtn.disabled = false;
+      });
+    });
+
+    return form;
+  }
+
+  function renderGallery() {
+    els.gallery.innerHTML = '';
+    if (state.photos.length === 0) {
+      els.gallery.appendChild(el('div', { class: 'comment-empty', text: 'No photos on this journey.' }));
+      return;
+    }
+
+    state.photos.forEach(function (p) {
+      var card = el('div', { class: 'photo-card', id: 'photo-' + p.id });
+
+      var img = el('img', { src: p.storage_path, alt: p.caption || 'Photo' });
+      img.addEventListener('click', function () {
+        els.lbImg.src = p.storage_path;
+        els.lightbox.classList.add('open');
+      });
+      card.appendChild(img);
+
+      var body = el('div', { class: 'pc-body' });
+      if (p.caption) body.appendChild(el('div', { class: 'pc-caption', text: p.caption }));
+      if (p.lat != null && p.lng != null) {
+        body.appendChild(el('div', { class: 'pc-coords', text: Number(p.lat).toFixed(5) + ', ' + Number(p.lng).toFixed(5) }));
+      }
+
+      var actions = el('div', { class: 'pc-actions' });
+      var likeBtn = el('button', { class: 'mini-like-btn' + (hasReacted(p.id) ? ' active' : '') });
+      var likeIcon = document.createTextNode(hasReacted(p.id) ? '❤️' : '🤍');
+      var likeCountSpan = document.createElement('span');
+      likeCountSpan.textContent = ' ' + reactionCount(p.id);
+      likeBtn.appendChild(likeIcon);
+      likeBtn.appendChild(likeCountSpan);
+      likeBtn.addEventListener('click', function () {
+        toggleReaction(p.id).then(function () {
+          likeBtn.classList.toggle('active', hasReacted(p.id));
+          likeBtn.replaceChild(document.createTextNode(hasReacted(p.id) ? '❤️' : '🤍'), likeBtn.firstChild);
+          likeCountSpan.textContent = ' ' + reactionCount(p.id);
+        });
+      });
+      actions.appendChild(likeBtn);
+
+      var pComments = commentsFor(p.id);
+      var toggleBtn = el('button', { class: 'pc-comment-toggle', text: '💬 ' + pComments.length });
+      actions.appendChild(toggleBtn);
+      body.appendChild(actions);
+
+      var commentsBlock = el('div', { class: 'photo-comments' });
+      function renderPhotoComments() {
+        commentsBlock.innerHTML = '';
+        var list = el('div', { class: 'comments-list' });
+        var current = commentsFor(p.id);
+        if (current.length === 0) list.appendChild(el('div', { class: 'comment-empty', text: 'No comments yet.' }));
+        current.forEach(function (c) { list.appendChild(buildCommentCard(c)); });
+        commentsBlock.appendChild(list);
+        commentsBlock.appendChild(buildCommentForm(p.id, function () {
+          renderPhotoComments();
+          toggleBtn.textContent = '💬 ' + commentsFor(p.id).length;
+        }));
+      }
+      renderPhotoComments();
+      toggleBtn.addEventListener('click', function () {
+        commentsBlock.classList.toggle('open');
+      });
+      body.appendChild(commentsBlock);
+
+      card.appendChild(body);
+      els.gallery.appendChild(card);
+    });
+  }
+
+  // ── Journey-level comments ────────────────────────────────────────────
+
+  function renderJourneyComments() {
+    els.journeyComments.innerHTML = '';
+    var top = state.comments.filter(function (c) { return c.photo_id === null; });
+    if (top.length === 0) {
+      els.journeyComments.appendChild(el('div', { class: 'comment-empty', text: 'No comments yet. Be the first!' }));
+    }
+    top.forEach(function (c) { els.journeyComments.appendChild(buildCommentCard(c)); });
+  }
+
+  els.journeyCommentForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = els.jcName.value.trim();
+    var body = els.jcBody.value.trim();
+    if (!name || !body) return;
+    rpc('add_shared_comment', {
+      p_id: journeyId, p_password: pw(), p_photo_id: null, p_author: name, p_body: body,
+    }).then(function (rows) {
+      state.comments.push(rows[0]);
+      els.jcBody.value = '';
+      renderJourneyComments();
+    }).catch(function (e) {
+      alert('Could not post comment: ' + e.message);
+    });
+  });
+
+  // ── Lightbox ───────────────────────────────────────────────────────────
+
+  els.lbClose.addEventListener('click', function () { els.lightbox.classList.remove('open'); });
+  els.lightbox.addEventListener('click', function (e) {
+    if (e.target === els.lightbox) els.lightbox.classList.remove('open');
+  });
+})();
+</script>
+</body>
+</html>
