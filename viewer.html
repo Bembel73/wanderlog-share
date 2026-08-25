@@ -101,6 +101,7 @@
   }
   .photo-card.highlight { outline: 2px solid var(--accent); }
   .photo-card img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; cursor: pointer; }
+  .photo-card video { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #000; }
   .photo-card .pc-body { padding: 10px; }
   .photo-card .pc-caption { font-size: 12px; color: var(--ink); margin-bottom: 6px; }
   .photo-card .pc-coords { font-size: 10px; color: var(--ink-faint); margin-bottom: 8px; }
@@ -180,7 +181,7 @@
   <div class="stats-row">
     <div class="stat-chip">📍 <b id="j-distance"></b></div>
     <div class="stat-chip">⏱ <b id="j-duration"></b></div>
-    <div class="stat-chip">📷 <b id="j-photocount"></b> photos</div>
+    <div class="stat-chip">📷 <b id="j-photocount"></b> items</div>
   </div>
 
   <div id="map"></div>
@@ -192,7 +193,7 @@
   </div>
 
   <section class="block">
-    <h2>Photos</h2>
+    <h2>Photos &amp; Videos</h2>
     <div id="gallery" class="gallery-grid"></div>
   </section>
 
@@ -527,13 +528,14 @@
     }
 
     var cameraSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="white"><path d="M9 2L7.17 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3.17L15 2H9zm3 15a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-2a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/></svg>';
+    var playSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>';
 
     state.photos.forEach(function (p) {
       if (p.lat == null || p.lng == null) return;
       var marker = L.marker([p.lat, p.lng], {
         icon: L.divIcon({
           className: '', iconSize: [26, 26], iconAnchor: [13, 13],
-          html: '<div style="width:26px;height:26px;border-radius:13px;background:#c4773a;border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.35);">' + cameraSvg + '</div>',
+          html: '<div style="width:26px;height:26px;border-radius:13px;background:#c4773a;border:2px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.35);">' + (p.media_type === 'video' ? playSvg : cameraSvg) + '</div>',
         }),
       }).addTo(map);
       marker.on('click', function () { focusPhoto(p.id); });
@@ -604,19 +606,24 @@
   function renderGallery() {
     els.gallery.innerHTML = '';
     if (state.photos.length === 0) {
-      els.gallery.appendChild(el('div', { class: 'comment-empty', text: 'No photos on this journey.' }));
+      els.gallery.appendChild(el('div', { class: 'comment-empty', text: 'No photos or videos on this journey.' }));
       return;
     }
 
     state.photos.forEach(function (p) {
       var card = el('div', { class: 'photo-card', id: 'photo-' + p.id });
 
-      var img = el('img', { src: p.storage_path, alt: p.caption || 'Photo' });
-      img.addEventListener('click', function () {
-        els.lbImg.src = p.storage_path;
-        els.lightbox.classList.add('open');
-      });
-      card.appendChild(img);
+      if (p.media_type === 'video') {
+        var video = el('video', { src: p.storage_path, controls: 'controls', preload: 'metadata', playsinline: 'true' });
+        card.appendChild(video);
+      } else {
+        var img = el('img', { src: p.storage_path, alt: p.caption || 'Photo' });
+        img.addEventListener('click', function () {
+          els.lbImg.src = p.storage_path;
+          els.lightbox.classList.add('open');
+        });
+        card.appendChild(img);
+      }
 
       var body = el('div', { class: 'pc-body' });
       if (p.caption) body.appendChild(el('div', { class: 'pc-caption', text: p.caption }));
