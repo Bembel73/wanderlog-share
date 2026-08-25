@@ -37,6 +37,14 @@
     min-height: 100vh; display: flex; align-items: center; justify-content: center;
     padding: 24px;
   }
+  /* An author-stylesheet `display` on the same element beats the browser's
+     built-in `[hidden] { display: none }` rule regardless of specificity, so
+     without this the gate's `hidden` attribute (set by enterApp()) does
+     nothing and it stays on screen - full height, covering the loaded
+     journey below - even after a correct password. */
+  #gate[hidden] {
+    display: none;
+  }
   .gate-card {
     background: var(--paper-card); border-radius: 20px; padding: 32px 28px;
     max-width: 380px; width: 100%; box-shadow: 0 8px 24px rgba(26,23,20,0.15);
